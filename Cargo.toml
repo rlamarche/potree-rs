@@ -1,0 +1,48 @@
+[package]
+name = "potree"
+version = "0.1.0"
+edition = "2024"
+
+[[example]]
+name = "read_wasm"
+required-features = ["wasm"]
+
+
+[[example]]
+name = "read_native"
+required-features = ["fs"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tracing = "0.1"
+bytes = "1"
+async-trait = "0.1"
+tokio = { version = "1", features = ["fs", "io-util"], optional = true }
+futures = "0.3.31"
+reqwest = { version = "0.12", optional = true }
+ehttp = { version = "0.5" }
+binrw = "0.15.0"
+glam = "0.30.5"
+wasm-bindgen = {  version = "=0.2.100", optional = true }
+wasm-bindgen-futures = {  version = "=0.4.50", optional = true }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "macros"] }
+tokio-util = { version = "0.7", features = ["compat"] }
+pollster = "0.4.0"
+wasm_thread = {  version = "0.3.3" }
+
+[features]
+default = []
+fs = ["dep:tokio"]
+reqwest = ["dep:reqwest"]
+wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.3.3", features = ["wasm_js"] }
+
+[profile.wasm-release]
+inherits = "release"
+opt-level = "s"

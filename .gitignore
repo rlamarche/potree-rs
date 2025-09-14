@@ -1,0 +1,8 @@
+/target
+/assets/
+/node_modules
+/wasm/*
+!/wasm/index.html
+/.idea
+/package.json
+/package-lock.json
