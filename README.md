@@ -9,9 +9,18 @@ Features / Roadmap:
 - [ ] Load points 
 - [ ] Octree frustum culling helpers
 
-# WASM Multithreaded
+# Download sample potree file
 
-This sample uses a webworker for parsing (blocking async using pollster), and delegates the http requests to the main thread (using provided `EhttpClientLocal`).
+Go in the `assets/heidentor` folder and run `dl.sh` script:
+
+```bash
+cd assets/heidentor/
+./dl.sh
+```
+
+# Run WASM Multithreaded example
+
+This example uses a webworker for parsing (blocking async using pollster), and delegates the http requests to the main thread (using provided `EhttpClientLocal`).
 
 Build using the provided script:
 
@@ -26,3 +35,4 @@ npm install express
 node serve.js
 ```
 
+Open the browser at address http://localhost:8080 and check network / console panels to see the requests / logs.
