@@ -22,6 +22,8 @@ cd assets/heidentor/
 
 This example uses a webworker for parsing (blocking async using pollster), and delegates the http requests to the main thread (using provided `EhttpClientLocal`).
 
+First comment the tokio dev dependency from `Cargo.toml`.
+
 Build using the provided script:
 
 ```bash

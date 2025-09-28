@@ -4,6 +4,7 @@ use super::{ResourceClient, ResourceError};
 #[cfg(target_arch = "wasm32")]
 use ehttp::Mode;
 
+#[derive(Clone, Debug)]
 pub struct EhttpClient;
 
 #[async_trait]

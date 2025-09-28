@@ -1,13 +1,9 @@
-use std::cell::OnceCell;
-use std::string::ToString;
-
 #[derive(Debug, Clone)]
 pub struct PointAttributeType {
     pub ordinal: usize,
     pub name: &'static str,
     pub size: u16,
 }
-
 
 macro_rules! create_data_type {
     // The `tt` (token tree) designator is used for

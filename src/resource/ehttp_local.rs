@@ -7,7 +7,7 @@ use futures::{SinkExt, StreamExt};
 use std::collections::BTreeMap;
 use wasm_bindgen_futures::spawn_local;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct EhttpClientLocal {
     tx_request: UnboundedSender<RequestMessage>,
 }

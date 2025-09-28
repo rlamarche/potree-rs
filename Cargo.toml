@@ -5,8 +5,7 @@ edition = "2024"
 
 [[example]]
 name = "read_wasm"
-required-features = ["wasm"]
-
+required-features = ["wasm_worker"]
 
 [[example]]
 name = "read_native"
@@ -17,28 +16,38 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
 tracing = "0.1"
-bytes = "1"
 async-trait = "0.1"
 tokio = { version = "1", features = ["fs", "io-util"], optional = true }
-futures = "0.3.31"
+async-fs = { version = "2.0", optional = true }
+futures = "0.3"
 reqwest = { version = "0.12", optional = true }
-ehttp = { version = "0.5" }
+ehttp = { version = "0.5", optional = true }
 binrw = "0.15.0"
 glam = "0.30.5"
-wasm-bindgen = {  version = "=0.2.100", optional = true }
-wasm-bindgen-futures = {  version = "=0.4.50", optional = true }
+wasm-bindgen = { version = "=0.2.100", optional = true }
+wasm-bindgen-futures = { version = "=0.4.50", optional = true }
+slab = "0.4"
+url = { version = "2.5" }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["rt", "macros"] }
-tokio-util = { version = "0.7", features = ["compat"] }
+# Comment the line below to compile WASM example
+tokio = { version = "1", features = ["rt", "macros", "rt-multi-thread"] }
 pollster = "0.4.0"
-wasm_thread = {  version = "0.3.3" }
+wasm_thread = { version = "0.3.3" }
+wasm-bindgen-spawn = "0.0.2"
+tracing-subscriber = "0.3"
+tracing-subscriber-wasm = "0.1.0"
 
 [features]
 default = []
-fs = ["dep:tokio"]
+fs = []
+tokio = ["dep:tokio", "tokio/rt"]
+async-fs = ["dep:async-fs"]
 reqwest = ["dep:reqwest"]
-wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures"]
+wasm = ["ehttp", "dep:wasm-bindgen"]
+wasm_worker = ["ehttp_local", "dep:wasm-bindgen"]
+ehttp = ["dep:ehttp"]
+ehttp_local = ["ehttp", "wasm", "dep:wasm-bindgen-futures"]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.3.3", features = ["wasm_js"] }

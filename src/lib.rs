@@ -1,8 +1,7 @@
 
-mod metadata;
-mod hierarchy;
-mod octree;
+pub mod metadata;
+pub mod hierarchy;
 pub mod resource;
-
-pub use metadata::*;
-pub use hierarchy::*;
+pub mod prelude;
+pub mod point_cloud;
+pub mod octree;
