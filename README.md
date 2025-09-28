@@ -20,17 +20,22 @@ cd assets/heidentor/
 
 # Run WASM Multithreaded example
 
-This example uses a webworker for parsing (blocking async using pollster), and delegates the http requests to the main thread (using provided `EhttpClientLocal`).
+This example uses a webworker for parsing, and delegates the http requests to the main thread (using provided `EhttpClientLocal`).
 
-First comment the tokio dev dependency from `Cargo.toml`.
+To prevent the worker to terminate and not executing async tasks, the example uses the hack mentionned in this issue: https://github.com/rustwasm/wasm-bindgen/issues/2945.
 
-Build using the provided script:
+
+To build the example, comment the tokio dev dependency from `Cargo.toml`.
+
+Then, build using the provided script: (install the required rust nightly if asked)
 
 ```bash
 ./build_wasm.sh
 ```
 
 Install express and run `serve.js`:
+
+Note: this server sends the security headers to allow using workers in WASM.
 
 ```bash
 npm install express

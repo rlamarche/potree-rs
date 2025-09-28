@@ -2,6 +2,7 @@ use potree::prelude::*;
 use tracing_subscriber::fmt;
 use tracing_subscriber_wasm::MakeConsoleWriter;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::spawn_local;
 use wasm_thread as thread;
 
 #[wasm_bindgen]
@@ -42,8 +43,7 @@ pub fn main() {
         || {
             log("Hello from thread!");
 
-            // can't use spawn_local here because we are in a worker thread
-            pollster::block_on(async move {
+            spawn_local(async move {
                 log("Hello from spawned local!");
 
                 tracing::info!("Load pointcloud from local filesystem");
@@ -63,8 +63,9 @@ pub fn main() {
                     .expect("Unable to load entire hierarchy");
 
                 tracing::info!("Successfuly loaded entire point cloud hierarchy.");
-                tracing::info!("{:#?}", point_cloud.hierarchy_snapshot());
             });
+
+            wasm_bindgen::throw_str("Cursed hack to keep workers alive. See https://github.com/rustwasm/wasm-bindgen/issues/2945");
         }
     });
 }
