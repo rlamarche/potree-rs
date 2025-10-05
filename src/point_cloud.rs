@@ -252,31 +252,48 @@ impl PotreePointCloud {
     }
 
     /// Takes a snapshot of the current loaded hierarchy and return it
-    pub fn hierarchy_snapshot(&self) -> OctreeNodeSnapshot {
+    pub fn hierarchy_snapshot(&self) -> Vec<OctreeNodeSnapshot> {
         self.hierarchy_snaphot_from_node(self.octree.root())
     }
 
-    fn hierarchy_snaphot_from_node(&self, node: &OctreeNode) -> OctreeNodeSnapshot {
-        OctreeNodeSnapshot {
-            name: node.name.clone(),
-            bounding_box: node.bounding_box.clone(),
-            spacing: node.spacing,
-            level: node.level,
-            node_type: node.node_type,
-            num_points: node.num_points,
-            byte_offset: node.byte_offset,
-            byte_size: node.byte_size,
-            hierarchy_byte_offset: node.hierarchy_byte_offset,
-            hierarchy_byte_size: node.hierarchy_byte_size,
-            children: node
-                .children
-                .iter()
-                .map(|child_id| {
-                    self.hierarchy_snaphot_from_node(
-                        self.octree.node(*child_id).expect("child not found"),
-                    )
-                })
-                .collect(),
+    fn hierarchy_snaphot_from_node(&self, node: &OctreeNode) -> Vec<OctreeNodeSnapshot> {
+        let mut stack = vec![(0_usize, node)];
+        let mut nodes = Vec::new();
+
+        while let Some((parent_index, node)) = stack.pop() {
+            // get the current node future index
+            let current_index = nodes.len();
+
+            // process children
+            for child in &node.children {
+                let child = self
+                    .octree
+                    .node(*child)
+                    .expect("missing node in hierarchy, shouldn't happen");
+                stack.push((current_index, child));
+            }
+
+            // add the current node to the nodes array
+            let mut node_snapshot: OctreeNodeSnapshot = node.into();
+            node_snapshot.index = current_index;
+            nodes.push(node_snapshot);
+
+            // if there is a parent, add it to the children array on an empty space
+            if parent_index < current_index {
+                let parent_node = &mut nodes[parent_index];
+                *parent_node
+                    .children
+                    .iter_mut()
+                    .find(|child| **child == 0)
+                    .expect("no empty child space available, there might be a problem") = current_index;
+            }
         }
+
+        nodes
+    }
+
+    // Functions to access the octree
+    pub fn octree(&self) -> &FlatOctree<OctreeNode> {
+        &self.octree
     }
 }
