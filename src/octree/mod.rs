@@ -4,10 +4,18 @@ pub mod snapshot;
 
 pub mod point_attributes;
 
+use std::fmt::Display;
+
 use slab::Slab;
 
 #[derive(Clone, Debug, Copy, Default)]
 pub struct NodeId(pub(crate) usize);
+
+impl Display for NodeId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct FlatOctree<T> {

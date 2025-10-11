@@ -78,6 +78,8 @@ impl PotreePointCloud {
 
         this.load_initial_hierarchy().await?;
 
+        println!("{:#?}", this.hierarchy_snapshot());
+
         Ok(this)
     }
 
@@ -98,7 +100,7 @@ impl PotreePointCloud {
         Ok(())
     }
 
-    async fn load_hierarchy(&mut self, node_id: NodeId) -> Result<(), ReadHierarchyError> {
+    pub async fn load_hierarchy(&mut self, node_id: NodeId) -> Result<(), ReadHierarchyError> {
         // get the root node
         let node = self.octree.node(node_id).unwrap();
 
