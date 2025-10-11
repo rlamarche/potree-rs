@@ -55,17 +55,34 @@ pub fn main() {
                 .expect("Unable to load point cloud");
 
                 tracing::info!("Successfuly loaded point cloud hierarchy.");
-                tracing::info!("{:#?}", point_cloud.hierarchy_snapshot());
+                let snapshot = point_cloud.hierarchy_snapshot();
+                tracing::info!(
+                    "Successfuly loaded point cloud hierarchy with {} nodes",
+                    snapshot.len()
+                );
+
+                let points = point_cloud
+                    .load_points(point_cloud.octree().root_id())
+                    .await
+                    .expect("Unable to load points");
+
+                tracing::info!("Loaded {} points", points.len());
 
                 point_cloud
                     .load_entire_hierarchy()
                     .await
                     .expect("Unable to load entire hierarchy");
 
-                tracing::info!("Successfuly loaded entire point cloud hierarchy.");
+                let full_snapshot = point_cloud.hierarchy_snapshot();
+                tracing::info!(
+                    "Successfuly loaded entire point cloud hierarchy with {} nodes.",
+                    full_snapshot.len()
+                );
             });
 
-            wasm_bindgen::throw_str("Cursed hack to keep workers alive. See https://github.com/rustwasm/wasm-bindgen/issues/2945");
+            wasm_bindgen::throw_str(
+                "Cursed hack to keep workers alive. See https://github.com/rustwasm/wasm-bindgen/issues/2945",
+            );
         }
     });
 }

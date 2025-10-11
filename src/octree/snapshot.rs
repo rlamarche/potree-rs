@@ -1,8 +1,10 @@
 use crate::octree::aabb::Aabb;
 use crate::octree::node::OctreeNode;
+use crate::octree::NodeId;
 
 #[derive(Clone, Debug, Default)]
 pub struct OctreeNodeSnapshot {
+    pub id: Option<NodeId>,
     pub index: usize,
     pub name: String,
     pub bounding_box: Aabb,
@@ -21,6 +23,7 @@ pub struct OctreeNodeSnapshot {
 impl From<&OctreeNode> for OctreeNodeSnapshot {
     fn from(node: &OctreeNode) -> Self {
         Self {
+            id: node.id,
             // unknown index, defaults to 0
             index: 0,
             name: node.name.clone(),

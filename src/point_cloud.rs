@@ -4,9 +4,12 @@ use crate::octree::aabb::create_child_aabb;
 use crate::octree::node::OctreeNode;
 use crate::octree::snapshot::OctreeNodeSnapshot;
 use crate::octree::{FlatOctree, NodeId};
+use crate::point::PointData;
 use crate::resource::{ResourceError, ResourceLoader};
 use binrw::BinReaderExt;
-use std::io::Cursor;
+use byteorder::{ByteOrder, LittleEndian};
+use glam::{DVec3, U8Vec3, U16Vec3, UVec3, Vec3A};
+use std::io::{Cursor, Read};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -26,17 +29,32 @@ pub enum ReadHierarchyError {
     #[error("Hierarchy is already loaded")]
     AlreadyLoaded,
 
-    #[error("Invalid json")]
+    #[error("Invalid json: {0}")]
     JsonError(#[from] serde_json::error::Error),
 
     #[error("IO Error")]
     Io(#[from] std::io::Error),
 
-    #[error("Resource error")]
+    #[error("Resource error: {0}")]
     Resource(#[from] ResourceError),
 
     #[error("Invalid binary data")]
     InvalidBinaryData(#[from] binrw::error::Error),
+}
+
+#[derive(Error, Debug)]
+pub enum LoadPointsError {
+    #[error("Node does not exists")]
+    NodeNotFound,
+
+    #[error("Resource error: {0}")]
+    Resource(#[from] ResourceError),
+
+    #[error("Encoding not implemented: {0}")]
+    EncodingUnimplemented(String),
+
+    #[error("IO Error: {0}")]
+    Io(#[from] std::io::Error),
 }
 
 #[derive(Clone, Debug)]
@@ -77,8 +95,6 @@ impl PotreePointCloud {
         };
 
         this.load_initial_hierarchy().await?;
-
-        println!("{:#?}", this.hierarchy_snapshot());
 
         Ok(this)
     }
@@ -287,15 +303,186 @@ impl PotreePointCloud {
                     .children
                     .iter_mut()
                     .find(|child| **child == 0)
-                    .expect("no empty child space available, there might be a problem") = current_index;
+                    .expect("no empty child space available, there might be a problem") =
+                    current_index;
             }
         }
 
         nodes
     }
 
+    // Functions to load points
+    pub async fn load_points(&self, node_id: NodeId) -> Result<Vec<PointData>, LoadPointsError> {
+        let node = self
+            .octree
+            .node(node_id)
+            .ok_or(LoadPointsError::NodeNotFound)?;
+
+        self.load_points_for_node(node).await
+    }
+
+    pub async fn load_points_for_node(
+        &self,
+        node: &OctreeNode,
+    ) -> Result<Vec<PointData>, LoadPointsError> {
+        let buffer = self
+            .resource_loader
+            .get_range(
+                &self.octree_url,
+                node.byte_offset,
+                node.byte_size as usize,
+                None,
+            )
+            .await?;
+
+        let points = match self.metadata.encoding.as_str() {
+            "BROTLI" => self.parse_points_brotli(node, &buffer)?,
+            _ => {
+                return Err(LoadPointsError::EncodingUnimplemented(
+                    self.metadata.encoding.clone(),
+                ));
+            }
+        };
+
+        Ok(points)
+    }
+
+    fn parse_points_brotli(
+        &self,
+        node: &OctreeNode,
+        buffer: &[u8],
+    ) -> Result<Vec<PointData>, LoadPointsError> {
+        let mut cursor = Cursor::new(buffer);
+        let mut input = brotli_decompressor::Decompressor::new(&mut cursor, 4096);
+        let mut decompressed_buffer = Vec::new();
+        let size = input.read_to_end(&mut decompressed_buffer)?;
+
+        let mut byte_offset: usize = 0;
+
+        let mut points = vec![PointData::default(); node.num_points as usize];
+
+        for point_attribute in &self.metadata.attributes {
+            let point_data = PointData::default();
+            points.push(point_data);
+
+            match point_attribute.name.as_str() {
+                "POSITION_CARTESIAN" | "position" => {
+                    let scale = &self.metadata.scale;
+                    let offset = &self.metadata.offset;
+
+                    for j in 0..node.num_points {
+                        let bytes = &decompressed_buffer[byte_offset..byte_offset + 16];
+                        let (x, y, z) = read_morton_128(bytes);
+
+                        points[j as usize].position = node.bounding_box.min
+                            + DVec3::new(
+                                x as f64 * scale[0] + offset[0] - node.bounding_box.min.x,
+                                y as f64 * scale[1] + offset[1] - node.bounding_box.min.y,
+                                z as f64 * scale[2] + offset[2] - node.bounding_box.min.z,
+                            );
+
+                        byte_offset += 16;
+                    }
+                }
+                "RGBA" | "rgba" | "RGB" | "rgb" => {
+                    for j in 0..node.num_points {
+                        let bytes = &decompressed_buffer[byte_offset..byte_offset + 8];
+                        let (r, g, b) = read_morton_64(bytes);
+
+                        points[j as usize].color = U8Vec3::new(
+                            if r > 255 { r / 256 } else { r } as u8,
+                            if g > 255 { g / 256 } else { g } as u8,
+                            if b > 255 { b / 256 } else { b } as u8,
+                        );
+
+                        byte_offset += 8;
+                    }
+                }
+                _ => {
+                    for j in 0..node.num_points {
+                        let bytes = &decompressed_buffer
+                            [byte_offset..byte_offset + point_attribute.size as usize];
+
+                        byte_offset += point_attribute.size as usize;
+                    }
+                }
+            }
+        }
+
+        // println!("Final offset: {}, size: {}", byte_offset, size);
+
+        Ok(points)
+    }
+
     // Functions to access the octree
     pub fn octree(&self) -> &FlatOctree<OctreeNode> {
         &self.octree
     }
+}
+
+fn read_morton_64(bytes: &[u8]) -> (u16, u16, u16) {
+    let mc_0 = LittleEndian::read_u32(&bytes[4..8]);
+    let mc_1 = LittleEndian::read_u32(&bytes[0..4]);
+
+    decode_morton_64(mc_0, mc_1)
+}
+
+fn read_morton_128(bytes: &[u8]) -> (u32, u32, u32) {
+    let mc_0 = LittleEndian::read_u32(&bytes[4..8]);
+    let mc_1 = LittleEndian::read_u32(&bytes[0..4]);
+    let mc_2 = LittleEndian::read_u32(&bytes[12..16]);
+    let mc_3 = LittleEndian::read_u32(&bytes[8..12]);
+
+    decode_morton_128(mc_0, mc_1, mc_2, mc_3)
+}
+
+fn dealign_24b(mut morton: u32) -> u32 {
+    // Garde seulement chaque 3ème bit
+    morton &= 0x09249249; // 0b001001001001001001001001001001
+
+    morton = (morton | (morton >> 2)) & 0x030c30c3;
+    morton = (morton | (morton >> 4)) & 0x0300f00f;
+    morton = (morton | (morton >> 8)) & 0x030000ff;
+    morton = (morton | (morton >> 16)) & 0x000003ff;
+
+    morton
+}
+
+fn decode_morton_64(mc_0: u32, mc_1: u32) -> (u16, u16, u16) {
+    let r = dealign_24b((mc_1 & 0x00FFFFFF) >> 0)
+        | (dealign_24b(((mc_1 >> 24) | (mc_0 << 8)) >> 0) << 8);
+
+    let g = dealign_24b((mc_1 & 0x00FFFFFF) >> 1)
+        | (dealign_24b(((mc_1 >> 24) | (mc_0 << 8)) >> 1) << 8);
+
+    let b = dealign_24b((mc_1 & 0x00FFFFFF) >> 2)
+        | (dealign_24b(((mc_1 >> 24) | (mc_0 << 8)) >> 2) << 8);
+
+    (r as u16, g as u16, b as u16)
+}
+
+fn decode_morton_128(mc_0: u32, mc_1: u32, mc_2: u32, mc_3: u32) -> (u32, u32, u32) {
+    // First part (lower bits)
+    let mut x = dealign_24b((mc_3 & 0x00FFFFFF) >> 0)
+        | (dealign_24b(((mc_3 >> 24) | (mc_2 << 8)) >> 0) << 8);
+
+    let mut y = dealign_24b((mc_3 & 0x00FFFFFF) >> 1)
+        | (dealign_24b(((mc_3 >> 24) | (mc_2 << 8)) >> 1) << 8);
+
+    let mut z = dealign_24b((mc_3 & 0x00FFFFFF) >> 2)
+        | (dealign_24b(((mc_3 >> 24) | (mc_2 << 8)) >> 2) << 8);
+
+    // Second part (upper bits) - only if needed
+    if mc_1 != 0 || mc_2 != 0 {
+        x |= (dealign_24b((mc_1 & 0x00FFFFFF) >> 0) << 16)
+            | (dealign_24b(((mc_1 >> 24) | (mc_0 << 8)) >> 0) << 24);
+
+        y |= (dealign_24b((mc_1 & 0x00FFFFFF) >> 1) << 16)
+            | (dealign_24b(((mc_1 >> 24) | (mc_0 << 8)) >> 1) << 24);
+
+        z |= (dealign_24b((mc_1 & 0x00FFFFFF) >> 2) << 16)
+            | (dealign_24b(((mc_1 >> 24) | (mc_0 << 8)) >> 2) << 24);
+    }
+
+    (x, y, z)
 }

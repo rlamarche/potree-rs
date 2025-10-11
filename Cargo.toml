@@ -28,6 +28,8 @@ wasm-bindgen = { version = "=0.2.100", optional = true }
 wasm-bindgen-futures = { version = "=0.4.50", optional = true }
 slab = "0.4"
 url = { version = "2.5" }
+brotli-decompressor = "5.0"
+byteorder = "1.5.0"
 
 [dev-dependencies]
 # Comment the line below to compile WASM example
