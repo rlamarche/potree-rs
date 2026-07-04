@@ -52,22 +52,7 @@ impl PotreeHttpAsset {
             tx_request
         };
 
-        let base_url = if url.ends_with('/') {
-            // remove leading /
-            url.trim_end_matches('/').to_string()
-        } else {
-            match url.rfind('/') {
-                // remove last part of the url if it ends with (metadata.json, hierarchy.bin or octree.bin)
-                Some(index) => {
-                    let (path, end) = url.split_at(index);
-                    match &end[1..] {
-                        "metadata.json" | "hierarchy.bin" | "octree.bin" => path.to_string(),
-                        _ => url.to_string(),
-                    }
-                }
-                None => url.to_string(),
-            }
-        };
+        let base_url = normalize_base_url(url);
 
         Self {
             base_url,
@@ -84,21 +69,21 @@ impl PotreeAsset for PotreeHttpAsset {
     type Error = PotreeHttpAssetError;
 
     async fn read_metadata(&self) -> Result<Metadata, Self::Error> {
-        let metadata_url = format!("{}/metadata.json", self.base_url);
+        let metadata_url = asset_url(&self.base_url, "metadata.json");
         let data = self.get(metadata_url.as_str(), None).await?;
 
         Ok(serde_json::from_slice(&data)?)
     }
 
     async fn read_hierarchy(&self, offset: u64, length: usize) -> Result<Bytes, Self::Error> {
-        let hierarchy_url = format!("{}/hierarchy.bin", self.base_url);
+        let hierarchy_url = asset_url(&self.base_url, "hierarchy.bin");
         Ok(self
             .get_range(hierarchy_url.as_str(), offset, length, None)
             .await?)
     }
 
     async fn read_octree(&self, offset: u64, length: usize) -> Result<Bytes, Self::Error> {
-        let octree_url = format!("{}/octree.bin", self.base_url);
+        let octree_url = asset_url(&self.base_url, "octree.bin");
         Ok(self
             .get_range(octree_url.as_str(), offset, length, None)
             .await?)
@@ -179,6 +164,47 @@ impl PotreeHttpAsset {
         headers.insert("range".to_string(), range_value);
 
         self.get(url, Some(headers)).await
+    }
+}
+
+fn normalize_base_url(url: &str) -> String {
+    if let Ok(mut parsed) = url::Url::parse(url) {
+        let path = strip_known_asset_filename(parsed.path()).to_string();
+        parsed.set_path(&path);
+        return parsed.to_string().trim_end_matches('/').to_string();
+    }
+
+    let (path, suffix) = split_url_suffix(url);
+    format!(
+        "{}{}",
+        strip_known_asset_filename(path).trim_end_matches('/'),
+        suffix
+    )
+}
+
+fn asset_url(base_url: &str, filename: &str) -> String {
+    if let Ok(mut parsed) = url::Url::parse(base_url) {
+        let path = parsed.path().trim_end_matches('/');
+        parsed.set_path(&format!("{path}/{filename}"));
+        return parsed.to_string();
+    }
+
+    let (path, suffix) = split_url_suffix(base_url);
+    format!("{}/{filename}{suffix}", path.trim_end_matches('/'))
+}
+
+fn strip_known_asset_filename(path: &str) -> &str {
+    let path = path.trim_end_matches('/');
+    match path.rsplit_once('/') {
+        Some((base, "metadata.json" | "hierarchy.bin" | "octree.bin")) => base,
+        _ => path,
+    }
+}
+
+fn split_url_suffix(url: &str) -> (&str, &str) {
+    match url.find(|c| c == '?' || c == '#') {
+        Some(index) => url.split_at(index),
+        None => (url, ""),
     }
 }
 

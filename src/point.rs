@@ -101,7 +101,7 @@ impl PointBuffer {
 
     /// Slice on all attributes, for 1 points
     pub fn get(&self, i: usize) -> Option<PointSlice<'_>> {
-        if self.attributes.len() > (i + 1) * self.stride {
+        if self.attributes.len() >= (i + 1) * self.stride {
             Some(PointSlice {
                 data: &self.attributes[i * self.stride..(i + 1) * self.stride],
                 layout: &self.layout,
@@ -223,5 +223,34 @@ impl<'a> AttributeSliceMut<'a> {
         self.data
             .chunks_exact_mut(self.stride)
             .map(|chunk| &mut chunk[self.offset..self.offset + self.width])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn xyz_layout() -> AttributeLayout {
+        vec![AttributeInfo {
+            name: "position".to_string(),
+            r#type: AttributeType::Position,
+            offset: 0,
+            stride: 3,
+        }]
+    }
+
+    #[test]
+    fn get_returns_every_point_including_the_last() {
+        let mut buffer = PointBuffer::new(xyz_layout());
+        buffer.push(&[1.0, 2.0, 3.0]);
+        buffer.push(&[4.0, 5.0, 6.0]);
+        buffer.count = 2;
+
+        assert_eq!(buffer.get(0).unwrap().data, &[1.0, 2.0, 3.0]);
+        assert_eq!(
+            buffer.get(1).expect("last point must be accessible").data,
+            &[4.0, 5.0, 6.0]
+        );
+        assert!(buffer.get(2).is_none());
     }
 }

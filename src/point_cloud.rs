@@ -283,6 +283,33 @@ impl PointCloud<PotreeFsAsset> {
     }
 }
 
+#[cfg(feature = "convert")]
+impl PointCloud<crate::convert::buffer::PotreeBufferAsset> {
+    /// Build a point cloud from in-memory Potree buffers (e.g. produced by the
+    /// converter), without touching the filesystem.
+    pub async fn from_buffers(
+        metadata_json: Vec<u8>,
+        hierarchy_bin: Vec<u8>,
+        octree_bin: Vec<u8>,
+    ) -> Result<
+        PointCloud<crate::convert::buffer::PotreeBufferAsset>,
+        PotreeHierarchyError<<crate::convert::buffer::PotreeBufferAsset as PotreeAsset>::Error>,
+    > {
+        let asset =
+            crate::convert::buffer::PotreeBufferAsset::new(metadata_json, hierarchy_bin, octree_bin);
+        let hierarchy = Hierarchy::new(asset)
+            .await
+            .map_err(PotreeHierarchyError::Read)?;
+        let octree = Octree::new();
+
+        let mut this = Self { hierarchy, octree };
+
+        this.load_initial_hierarchy().await?;
+
+        Ok(this)
+    }
+}
+
 impl<T> PointCloud<T> {
     /// Takes a snapshot of the current loaded hierarchy and return it
     pub fn hierarchy_snapshot(&self) -> Vec<OctreeNodeSnapshot> {

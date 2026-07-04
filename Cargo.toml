@@ -23,6 +23,11 @@ required-features = ["fs", "tokio_dev"]
 name = "read_native_blocking_fs"
 required-features = ["blocking_fs"]
 
+
+[[example]]
+name = "read_native_fs_ply"
+required-features = ["convert", "slab", "tokio_dev"]
+
 [[example]]
 path = "examples/read_native_http.rs"
 name = "read_native_ehttp"
@@ -50,12 +55,19 @@ reqwest = { version = "0.12", optional = true, features = ["json"] }
 ehttp = { version = "0.5", optional = true }
 binrw = "0.15.0"
 glam = "0.30.5"
-wasm-bindgen = { version = "=0.2.106", optional = true }
-wasm-bindgen-futures = { version = "=0.4.56", optional = true }
+wasm-bindgen = { version = ">=0.2.106", optional = true }
+wasm-bindgen-futures = { version = ">=0.4.56", optional = true }
 slab = { version = "0.4", optional = true }
 url = { version = "2.5" }
 brotli-decompressor = "5.0"
 byteorder = "1.5.0"
+clap = { version = "4", features = ["derive"], optional = true}
+ply-rs-bw = { version = "3.0.0", optional = true }
+rand = { version = "0.8", optional = true }
+indicatif = "0.18.4"
+rayon = { version = "1.10", optional = true }
+tempfile = { version = "3", optional = true }
+brotli = "8.0.2"
 bytes = "1.0"
 
 [dev-dependencies]
@@ -76,6 +88,7 @@ wasm = ["ehttp", "dep:wasm-bindgen", "dep:wasm-bindgen-futures"]
 wasm_worker = ["ehttp_local", "dep:wasm-bindgen", "dep:wasm-bindgen-futures"]
 ehttp = ["async", "dep:ehttp"]
 ehttp_local = ["ehttp", "wasm", "dep:wasm-bindgen-futures"]
+convert = ["fs", "dep:clap", "dep:ply-rs-bw", "dep:rand", "dep:rayon", "dep:tempfile"]
 slab = ["dep:slab"]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -84,3 +97,7 @@ getrandom = { version = "0.3.3", features = ["wasm_js"] }
 [profile.wasm-release]
 inherits = "release"
 opt-level = "s"
+
+[[bin]]
+name = "ply_to_potree"
+required-features = ["convert"]

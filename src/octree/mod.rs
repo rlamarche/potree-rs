@@ -51,7 +51,8 @@ impl<'a, T> VacantEntry<'a, T> {
     /// # Examples
     ///
     /// ```
-    /// let mut slab = GenerationalSlab::new();
+    /// use slab::Slab;
+    /// let mut slab = Slab::new();
     ///
     /// let hello = {
     ///     let entry = slab.vacant_entry();
