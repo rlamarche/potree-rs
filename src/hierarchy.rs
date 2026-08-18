@@ -40,8 +40,9 @@ impl Hierarchy<PotreeUrlAsset> {
     ///  - Metadata: `<url>/metadata.json`
     ///  - Hierarchy: `<url>/hierarchy.bin`
     ///  - Octree: `<url>/octree.bin`
-    pub async fn try_from_url(url: &str) -> Result<Self, <PotreeUrlAsset as PotreeAsset>::Error> {
-        let asset = PotreeUrlAsset::from_url(url)?;
+    pub async fn try_from_url(url: &str) -> Result<Self, PotreeHierarchyError> {
+        let asset =
+            PotreeUrlAsset::from_url(url).map_err(|e| PotreeHierarchyError::Read(Box::new(e)))?;
 
         Self::load(asset).await
     }
@@ -55,7 +56,7 @@ impl Hierarchy<PotreeHttpAsset> {
     ///  - Hierarchy: `<url>/hierarchy.bin`
     ///  - Octree: `<url>/octree.bin`
     #[cfg(any(feature = "reqwest", feature = "ehttp"))]
-    pub async fn from_http_url(url: &str) -> Result<Self, <PotreeHttpAsset as PotreeAsset>::Error> {
+    pub async fn from_http_url(url: &str) -> Result<Self, PotreeHierarchyError> {
         let asset = PotreeHttpAsset::from_url(url);
 
         Self::load(asset).await
@@ -69,9 +70,7 @@ impl Hierarchy<PotreeFsAsset> {
     ///  - Metadata: `<path>/metadata.json`
     ///  - Hierarchy: `<path>/hierarchy.bin`
     ///  - Octree: `<path>/octree.bin`
-    pub async fn from_path(
-        path: impl Into<PathBuf>,
-    ) -> Result<Self, <PotreeFsAsset as PotreeAsset>::Error> {
+    pub async fn from_path(path: impl Into<PathBuf>) -> Result<Self, PotreeHierarchyError> {
         let asset = PotreeFsAsset::from_path(path);
 
         Self::load(asset).await
@@ -81,29 +80,22 @@ impl Hierarchy<PotreeFsAsset> {
 #[cfg(any(feature = "reqwest", feature = "ehttp", feature = "fs"))]
 #[async_trait]
 pub trait HierarchyAsync<T: PotreeAsset> {
-    async fn load_initial_hierarchy(
-        &self,
-    ) -> Result<Vec<OctreeNode>, PotreeHierarchyError<T::Error>>;
+    async fn load_initial_hierarchy(&self) -> Result<Vec<OctreeNode>, PotreeHierarchyError>;
 
     async fn load_hierarchy(
         &self,
         node: &OctreeNode,
-    ) -> Result<Vec<OctreeNode>, PotreeHierarchyError<T::Error>>;
+    ) -> Result<Vec<OctreeNode>, PotreeHierarchyError>;
 
-    async fn load_entire_hierarchy(
-        &self,
-    ) -> Result<Vec<OctreeNode>, PotreeHierarchyError<T::Error>>;
+    async fn load_entire_hierarchy(&self) -> Result<Vec<OctreeNode>, PotreeHierarchyError>;
 
     async fn load_entire_hierarchy_from_proxy(
         &self,
         node: OctreeNode,
-    ) -> Result<Vec<OctreeNode>, PotreeHierarchyError<T::Error>>;
+    ) -> Result<Vec<OctreeNode>, PotreeHierarchyError>;
 
     // Functions to load points
-    async fn load_points(
-        &self,
-        node: &OctreeNode,
-    ) -> Result<Points, PotreeHierarchyError<T::Error>>;
+    async fn load_points(&self, node: &OctreeNode) -> Result<Points, PotreeHierarchyError>;
 }
 
 #[cfg(any(feature = "reqwest", feature = "ehttp", feature = "fs"))]
@@ -114,8 +106,13 @@ impl<T: PotreeAsset> Hierarchy<T> {
     ///  - Metadata: `<url>/metadata.json`
     ///  - Hierarchy: `<url>/hierarchy.bin`
     ///  - Octree: `<url>/octree.bin`
-    pub async fn load(asset: T) -> Result<Self, T::Error> {
-        let metadata = asset.read_metadata().await?;
+    pub async fn load(asset: T) -> Result<Self, PotreeHierarchyError> {
+        let buffer = asset
+            .read_metadata()
+            .await
+            .map_err(|e| PotreeHierarchyError::Read(Box::new(e)))?;
+
+        let metadata = serde_json::from_slice(&buffer)?;
 
         Ok(Self { metadata, asset })
     }
@@ -124,9 +121,7 @@ impl<T: PotreeAsset> Hierarchy<T> {
 #[cfg(any(feature = "reqwest", feature = "ehttp", feature = "fs"))]
 #[async_trait]
 impl<T: PotreeAsset> HierarchyAsync<T> for Hierarchy<T> {
-    async fn load_initial_hierarchy(
-        &self,
-    ) -> Result<Vec<OctreeNode>, PotreeHierarchyError<T::Error>> {
+    async fn load_initial_hierarchy(&self) -> Result<Vec<OctreeNode>, PotreeHierarchyError> {
         // load root node metadatas
         let root = self.metadata.create_flat_root_node();
 
@@ -139,7 +134,7 @@ impl<T: PotreeAsset> HierarchyAsync<T> for Hierarchy<T> {
     async fn load_hierarchy(
         &self,
         node: &OctreeNode,
-    ) -> Result<Vec<OctreeNode>, PotreeHierarchyError<T::Error>> {
+    ) -> Result<Vec<OctreeNode>, PotreeHierarchyError> {
         if matches!(node.node_type, NodeType::Proxy) {
             let data = self
                 .asset
@@ -148,7 +143,7 @@ impl<T: PotreeAsset> HierarchyAsync<T> for Hierarchy<T> {
                     node.hierarchy_byte_size as usize,
                 )
                 .await
-                .map_err(PotreeHierarchyError::Read)?;
+                .map_err(|e| PotreeHierarchyError::Read(Box::new(e)))?;
 
             Ok(parse_flat_hierarchy(node, &data)?)
         } else {
@@ -157,9 +152,7 @@ impl<T: PotreeAsset> HierarchyAsync<T> for Hierarchy<T> {
         }
     }
 
-    async fn load_entire_hierarchy(
-        &self,
-    ) -> Result<Vec<OctreeNode>, PotreeHierarchyError<T::Error>> {
+    async fn load_entire_hierarchy(&self) -> Result<Vec<OctreeNode>, PotreeHierarchyError> {
         let root = self.metadata.create_flat_root_node();
 
         Ok(self.load_entire_hierarchy_from_proxy(root).await?)
@@ -168,7 +161,7 @@ impl<T: PotreeAsset> HierarchyAsync<T> for Hierarchy<T> {
     async fn load_entire_hierarchy_from_proxy(
         &self,
         node: OctreeNode,
-    ) -> Result<Vec<OctreeNode>, PotreeHierarchyError<T::Error>> {
+    ) -> Result<Vec<OctreeNode>, PotreeHierarchyError> {
         if !matches!(node.node_type, NodeType::Proxy) {
             // node is not a proxy
             return Err(PotreeHierarchyError::NothingToLoad);
@@ -238,15 +231,12 @@ impl<T: PotreeAsset> HierarchyAsync<T> for Hierarchy<T> {
         Ok(nodes)
     }
 
-    async fn load_points(
-        &self,
-        node: &OctreeNode,
-    ) -> Result<Points, PotreeHierarchyError<T::Error>> {
+    async fn load_points(&self, node: &OctreeNode) -> Result<Points, PotreeHierarchyError> {
         let buffer = self
             .asset
             .read_octree(node.byte_offset, node.byte_size as usize)
             .await
-            .map_err(PotreeHierarchyError::Read)?;
+            .map_err(|e| PotreeHierarchyError::Read(Box::new(e)))?;
 
         let points = self
             .metadata
@@ -256,16 +246,21 @@ impl<T: PotreeAsset> HierarchyAsync<T> for Hierarchy<T> {
     }
 }
 
+pub type ReadError = Box<dyn std::error::Error + Send + Sync + 'static>;
+
 #[derive(Debug, Error)]
-pub enum PotreeHierarchyError<ReadError: std::error::Error> {
+pub enum PotreeHierarchyError {
+    #[error("parse metadata error: {0}")]
+    ParseMetadata(#[from] serde_json::Error),
+
     #[error("parse hierarchy error: {0}")]
     ParseHierarchy(#[from] ParseHierarchyError),
 
     #[error("load points error: {0}")]
     ParsePoints(#[from] LoadPointsError),
 
-    #[error("Read error: {0}")]
-    Read(ReadError),
+    #[error("read error: {0}")]
+    Read(#[source] ReadError),
 
     #[error("There is nothing to load because node is not a proxy")]
     NothingToLoad,

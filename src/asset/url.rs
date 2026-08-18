@@ -7,7 +7,7 @@ use url::Url;
 use crate::asset::fs::PotreeFsAsset;
 #[cfg(any(feature = "reqwest", feature = "ehttp"))]
 use crate::asset::http::PotreeHttpAsset;
-use crate::{asset::PotreeAsset, metadata::Metadata};
+use crate::asset::PotreeAsset;
 
 pub struct PotreeUrlAsset {
     inner: InnerAsset,
@@ -67,7 +67,7 @@ impl PotreeUrlAsset {
 impl PotreeAsset for PotreeUrlAsset {
     type Error = PotreeUrlAssetError;
 
-    async fn read_metadata(&self) -> Result<Metadata, Self::Error> {
+    async fn read_metadata(&self) -> Result<Bytes, Self::Error> {
         match &self.inner {
             #[cfg(any(feature = "reqwest", feature = "ehttp"))]
             InnerAsset::Http(potree_http_asset) => Ok(potree_http_asset

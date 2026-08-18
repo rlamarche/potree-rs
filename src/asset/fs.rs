@@ -8,7 +8,7 @@ use thiserror::Error;
 #[cfg(feature = "tokio")]
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
-use crate::{asset::PotreeAsset, metadata::Metadata};
+use crate::asset::PotreeAsset;
 
 pub struct PotreeFsAsset {
     base_path: PathBuf,
@@ -26,16 +26,16 @@ impl PotreeFsAsset {
 impl PotreeAsset for PotreeFsAsset {
     type Error = PotreeFsAssetError;
 
-    async fn read_metadata(&self) -> Result<Metadata, Self::Error> {
+    async fn read_metadata(&self) -> Result<Bytes, Self::Error> {
         let metadata_path = self.base_path.join("metadata.json");
 
         #[cfg(feature = "tokio")]
-        let buffer = tokio::fs::read(metadata_path).await?;
+        let bytes = tokio::fs::read(metadata_path).await?;
 
         #[cfg(not(feature = "tokio"))]
-        let buffer = std::fs::read(metadata_path)?;
+        let bytes = std::fs::read(metadata_path)?;
 
-        Ok(serde_json::from_slice(&buffer)?)
+        Ok(bytes.into())
     }
 
     async fn read_hierarchy(&self, offset: u64, length: usize) -> Result<Bytes, Self::Error> {

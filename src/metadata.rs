@@ -128,9 +128,7 @@ impl AttributeFormat {
 
             AttributeFormat::Float => f32::from_le_bytes(bytes[0..4].try_into().unwrap()) as f64,
 
-            AttributeFormat::Double => {
-                f64::from_le_bytes(bytes[0..8].try_into().unwrap())
-            }
+            AttributeFormat::Double => f64::from_le_bytes(bytes[0..8].try_into().unwrap()),
 
             AttributeFormat::Undefined => 0.0,
         }
@@ -290,11 +288,9 @@ impl Metadata {
                                 (0.0, 1.0)
                             };
 
-                            attribute[i] = (point_attribute
-                                .r#type
-                                .parse(&bytes[i..i + element_size])
-                                * scale
-                                + offset) as f32;
+                            attribute[i] =
+                                (point_attribute.r#type.parse(&bytes[i..i + element_size]) * scale
+                                    + offset) as f32;
                         }
                     }
                 }
@@ -407,11 +403,9 @@ impl Metadata {
                                 (0.0, 1.0)
                             };
 
-                            attribute[i] = (point_attribute
-                                .r#type
-                                .parse(&bytes[i..i + element_size])
-                                * scale
-                                + offset) as f32;
+                            attribute[i] =
+                                (point_attribute.r#type.parse(&bytes[i..i + element_size]) * scale
+                                    + offset) as f32;
 
                             byte_offset += point_attribute.size as usize;
                         }

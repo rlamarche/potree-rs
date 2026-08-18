@@ -14,23 +14,23 @@ use crate::prelude::{PointCloud, PotreePointCloudError};
 use binrw::prelude::*;
 
 pub trait PointCloudSync<T: BlockingPotreeAsset> {
-    fn load_initial_hierarchy(&mut self) -> Result<(), PotreeHierarchyError<T::Error>>;
+    fn load_initial_hierarchy(&mut self) -> Result<(), PotreeHierarchyError>;
 
-    fn load_hierarchy(&mut self, node_id: NodeId) -> Result<(), PotreePointCloudError<T::Error>>;
+    fn load_hierarchy(&mut self, node_id: NodeId) -> Result<(), PotreePointCloudError>;
 
-    fn load_entire_hierarchy(&mut self) -> Result<(), PotreePointCloudError<T::Error>>;
+    fn load_entire_hierarchy(&mut self) -> Result<(), PotreePointCloudError>;
 
     fn load_entire_hierarchy_recursive(
         &mut self,
         node_id: NodeId,
-    ) -> Result<(), PotreePointCloudError<T::Error>>;
+    ) -> Result<(), PotreePointCloudError>;
 
     // Functions to load points
-    fn load_points(&self, node_id: NodeId) -> Result<Points, PotreePointCloudError<T::Error>>;
+    fn load_points(&self, node_id: NodeId) -> Result<Points, PotreePointCloudError>;
 }
 
 impl<T: BlockingPotreeAsset> PointCloudSync<T> for PointCloud<T> {
-    fn load_initial_hierarchy(&mut self) -> Result<(), PotreeHierarchyError<T::Error>> {
+    fn load_initial_hierarchy(&mut self) -> Result<(), PotreeHierarchyError> {
         // load root node metadatas
         let initial_hierarchy = self.hierarchy.load_initial_hierarchy()?;
 
@@ -67,7 +67,7 @@ impl<T: BlockingPotreeAsset> PointCloudSync<T> for PointCloud<T> {
         Ok(())
     }
 
-    fn load_hierarchy(&mut self, node_id: NodeId) -> Result<(), PotreePointCloudError<T::Error>> {
+    fn load_hierarchy(&mut self, node_id: NodeId) -> Result<(), PotreePointCloudError> {
         // get the root node
         let node = self
             .octree
@@ -126,7 +126,7 @@ impl<T: BlockingPotreeAsset> PointCloudSync<T> for PointCloud<T> {
         Ok(())
     }
 
-    fn load_entire_hierarchy(&mut self) -> Result<(), PotreePointCloudError<T::Error>> {
+    fn load_entire_hierarchy(&mut self) -> Result<(), PotreePointCloudError> {
         // get the root node
         let root = self
             .octree
@@ -145,7 +145,7 @@ impl<T: BlockingPotreeAsset> PointCloudSync<T> for PointCloud<T> {
     fn load_entire_hierarchy_recursive(
         &mut self,
         node_id: NodeId,
-    ) -> Result<(), PotreePointCloudError<T::Error>> {
+    ) -> Result<(), PotreePointCloudError> {
         // load node's hierarchy if needed
         self.load_hierarchy(node_id)?;
 
@@ -166,7 +166,7 @@ impl<T: BlockingPotreeAsset> PointCloudSync<T> for PointCloud<T> {
     }
 
     // Functions to load points
-    fn load_points(&self, node_id: NodeId) -> Result<Points, PotreePointCloudError<T::Error>> {
+    fn load_points(&self, node_id: NodeId) -> Result<Points, PotreePointCloudError> {
         let node = self
             .octree
             .node(node_id)
@@ -185,13 +185,10 @@ impl PointCloud<BlockingPotreeHttpAsset> {
     ///  - Octree: `<url>/octree.bin`
     pub async fn from_url(
         url: &str,
-    ) -> Result<
-        PointCloud<BlockingPotreeHttpAsset>,
-        PotreeHierarchyError<<BlockingPotreeHttpAsset as BlockingPotreeAsset>::Error>,
-    > {
+    ) -> Result<PointCloud<BlockingPotreeHttpAsset>, PotreeHierarchyError> {
         let hierarchy = Hierarchy::from_http_url_blocking(url)
             .await
-            .map_err(PotreeHierarchyError::Read)?;
+            .map_err(|e| PotreeHierarchyError::Read(Box::new(e)))?;
         let octree = Octree::new();
 
         let mut this = Self { hierarchy, octree };

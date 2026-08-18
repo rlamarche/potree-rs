@@ -11,22 +11,19 @@ use std::collections::VecDeque;
 use tracing::warn;
 
 pub trait HierarchySync<T: BlockingPotreeAsset> {
-    fn load_initial_hierarchy(&self) -> Result<Vec<OctreeNode>, PotreeHierarchyError<T::Error>>;
+    fn load_initial_hierarchy(&self) -> Result<Vec<OctreeNode>, PotreeHierarchyError>;
 
-    fn load_hierarchy(
-        &self,
-        node: &OctreeNode,
-    ) -> Result<Vec<OctreeNode>, PotreeHierarchyError<T::Error>>;
+    fn load_hierarchy(&self, node: &OctreeNode) -> Result<Vec<OctreeNode>, PotreeHierarchyError>;
 
-    fn load_entire_hierarchy(&self) -> Result<Vec<OctreeNode>, PotreeHierarchyError<T::Error>>;
+    fn load_entire_hierarchy(&self) -> Result<Vec<OctreeNode>, PotreeHierarchyError>;
 
     fn load_entire_hierarchy_from_proxy(
         &self,
         node: OctreeNode,
-    ) -> Result<Vec<OctreeNode>, PotreeHierarchyError<T::Error>>;
+    ) -> Result<Vec<OctreeNode>, PotreeHierarchyError>;
 
     // Functions to load points
-    fn load_points(&self, node: &OctreeNode) -> Result<Points, PotreeHierarchyError<T::Error>>;
+    fn load_points(&self, node: &OctreeNode) -> Result<Points, PotreeHierarchyError>;
 }
 
 impl<T: BlockingPotreeAsset> Hierarchy<T> {
@@ -70,7 +67,7 @@ impl Hierarchy<BlockingPotreeHttpAsset> {
 }
 
 impl<T: BlockingPotreeAsset> HierarchySync<T> for Hierarchy<T> {
-    fn load_initial_hierarchy(&self) -> Result<Vec<OctreeNode>, PotreeHierarchyError<T::Error>> {
+    fn load_initial_hierarchy(&self) -> Result<Vec<OctreeNode>, PotreeHierarchyError> {
         // load root node metadatas
         let root = self.metadata.create_flat_root_node();
 
@@ -80,10 +77,7 @@ impl<T: BlockingPotreeAsset> HierarchySync<T> for Hierarchy<T> {
         Ok(nodes)
     }
 
-    fn load_hierarchy(
-        &self,
-        node: &OctreeNode,
-    ) -> Result<Vec<OctreeNode>, PotreeHierarchyError<T::Error>> {
+    fn load_hierarchy(&self, node: &OctreeNode) -> Result<Vec<OctreeNode>, PotreeHierarchyError> {
         if matches!(node.node_type, NodeType::Proxy) {
             let data = self
                 .asset
@@ -91,7 +85,7 @@ impl<T: BlockingPotreeAsset> HierarchySync<T> for Hierarchy<T> {
                     node.hierarchy_byte_offset,
                     node.hierarchy_byte_size as usize,
                 )
-                .map_err(PotreeHierarchyError::Read)?;
+                .map_err(|e| PotreeHierarchyError::Read(Box::new(e)))?;
 
             Ok(parse_flat_hierarchy(node, &data)?)
         } else {
@@ -100,7 +94,7 @@ impl<T: BlockingPotreeAsset> HierarchySync<T> for Hierarchy<T> {
         }
     }
 
-    fn load_entire_hierarchy(&self) -> Result<Vec<OctreeNode>, PotreeHierarchyError<T::Error>> {
+    fn load_entire_hierarchy(&self) -> Result<Vec<OctreeNode>, PotreeHierarchyError> {
         let root = self.metadata.create_flat_root_node();
 
         self.load_entire_hierarchy_from_proxy(root)
@@ -109,7 +103,7 @@ impl<T: BlockingPotreeAsset> HierarchySync<T> for Hierarchy<T> {
     fn load_entire_hierarchy_from_proxy(
         &self,
         node: OctreeNode,
-    ) -> Result<Vec<OctreeNode>, PotreeHierarchyError<T::Error>> {
+    ) -> Result<Vec<OctreeNode>, PotreeHierarchyError> {
         if !matches!(node.node_type, NodeType::Proxy) {
             // node is not a proxy
             return Err(PotreeHierarchyError::NothingToLoad);
@@ -180,11 +174,11 @@ impl<T: BlockingPotreeAsset> HierarchySync<T> for Hierarchy<T> {
     }
 
     // Functions to load points
-    fn load_points(&self, node: &OctreeNode) -> Result<Points, PotreeHierarchyError<T::Error>> {
+    fn load_points(&self, node: &OctreeNode) -> Result<Points, PotreeHierarchyError> {
         let buffer = self
             .asset
             .read_octree(node.byte_offset, node.byte_size as usize)
-            .map_err(PotreeHierarchyError::Read)?;
+            .map_err(|e| PotreeHierarchyError::Read(Box::new(e)))?;
 
         let points = self
             .metadata

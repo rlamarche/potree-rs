@@ -15,7 +15,7 @@ use thiserror::Error;
 #[cfg(feature = "ehttp_local")]
 use wasm_bindgen_futures::spawn_local;
 
-use crate::{asset::PotreeAsset, metadata::Metadata};
+use crate::asset::PotreeAsset;
 
 pub struct PotreeHttpAsset {
     base_url: String,
@@ -83,11 +83,9 @@ impl PotreeHttpAsset {
 impl PotreeAsset for PotreeHttpAsset {
     type Error = PotreeHttpAssetError;
 
-    async fn read_metadata(&self) -> Result<Metadata, Self::Error> {
+    async fn read_metadata(&self) -> Result<Bytes, Self::Error> {
         let metadata_url = format!("{}/metadata.json", self.base_url);
-        let data = self.get(metadata_url.as_str(), None).await?;
-
-        Ok(serde_json::from_slice(&data)?)
+        Ok(self.get(metadata_url.as_str(), None).await?)
     }
 
     async fn read_hierarchy(&self, offset: u64, length: usize) -> Result<Bytes, Self::Error> {

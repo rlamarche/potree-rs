@@ -153,15 +153,23 @@ pub struct PointSlice<'a> {
 }
 
 impl<'a> PointSlice<'a> {
-    pub fn attribute(&self, name: &str) -> Option<&[f32]> {
-        let attribute_info = self.layout.iter().find(|a| a.name.eq(name))?;
-
+    /// Returns the attribute matching provided `attribute_info` parameter.
+    pub fn attribute(&self, attribute_info: &AttributeInfo) -> Option<&[f32]> {
         Some(&self.data[attribute_info.offset..(attribute_info.offset + attribute_info.stride)])
     }
-    pub fn attribute_type(&self, attribute_type: AttributeType) -> Option<&[f32]> {
+
+    /// Returns the first attribute whose name matches `name` parameter.
+    pub fn attribute_by_name(&self, name: &str) -> Option<&[f32]> {
+        let attribute_info = self.layout.iter().find(|a| a.name.eq(name))?;
+
+        self.attribute(attribute_info)
+    }
+
+    /// Returns the first attribute whose type matches `attribute_type` parameter.
+    pub fn attribute_by_type(&self, attribute_type: AttributeType) -> Option<&[f32]> {
         let attribute_info = self.layout.iter().find(|a| a.r#type.eq(&attribute_type))?;
 
-        Some(&self.data[attribute_info.offset..(attribute_info.offset + attribute_info.stride)])
+        self.attribute(attribute_info)
     }
 }
 
