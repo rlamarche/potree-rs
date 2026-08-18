@@ -4,25 +4,25 @@ use crate::asset::fs::PotreeFsAsset;
 use crate::asset::http::PotreeHttpAsset;
 #[cfg(any(feature = "reqwest", feature = "ehttp", feature = "fs"))]
 use crate::asset::url::PotreeUrlAsset;
-#[cfg(any(feature = "reqwest", feature = "ehttp", feature = "fs"))]
+#[cfg(feature = "async")]
 use crate::asset::PotreeAsset;
-#[cfg(any(feature = "reqwest", feature = "ehttp", feature = "fs"))]
+#[cfg(feature = "async")]
 use crate::metadata::Points;
 use crate::metadata::{LoadPointsError, Metadata};
-#[cfg(any(feature = "reqwest", feature = "ehttp", feature = "fs"))]
+#[cfg(feature = "async")]
 use crate::octree::node::{NodeType, OctreeNode};
-#[cfg(any(feature = "reqwest", feature = "ehttp", feature = "fs"))]
+#[cfg(feature = "async")]
 use crate::parse::parse_flat_hierarchy;
 use crate::parse::ParseHierarchyError;
-#[cfg(any(feature = "reqwest", feature = "ehttp", feature = "fs"))]
+#[cfg(feature = "async")]
 use async_trait::async_trait;
 use binrw::prelude::*;
-#[cfg(any(feature = "reqwest", feature = "ehttp", feature = "fs"))]
+#[cfg(feature = "async")]
 use std::collections::VecDeque;
 #[cfg(feature = "fs")]
 use std::path::PathBuf;
 use thiserror::Error;
-#[cfg(any(feature = "reqwest", feature = "ehttp", feature = "fs"))]
+#[cfg(feature = "async")]
 use tracing::warn;
 
 #[derive(Clone, Debug)]
@@ -77,7 +77,7 @@ impl Hierarchy<PotreeFsAsset> {
     }
 }
 
-#[cfg(any(feature = "reqwest", feature = "ehttp", feature = "fs"))]
+#[cfg(feature = "async")]
 #[async_trait]
 pub trait HierarchyAsync<T: PotreeAsset> {
     async fn load_initial_hierarchy(&self) -> Result<Vec<OctreeNode>, PotreeHierarchyError>;
@@ -98,7 +98,7 @@ pub trait HierarchyAsync<T: PotreeAsset> {
     async fn load_points(&self, node: &OctreeNode) -> Result<Points, PotreeHierarchyError>;
 }
 
-#[cfg(any(feature = "reqwest", feature = "ehttp", feature = "fs"))]
+#[cfg(feature = "async")]
 impl<T: PotreeAsset> Hierarchy<T> {
     /// Load a Potree point cloud from a URL.
     /// Relatives urls works only if the provided client supports it.
@@ -118,7 +118,7 @@ impl<T: PotreeAsset> Hierarchy<T> {
     }
 }
 
-#[cfg(any(feature = "reqwest", feature = "ehttp", feature = "fs"))]
+#[cfg(feature = "async")]
 #[async_trait]
 impl<T: PotreeAsset> HierarchyAsync<T> for Hierarchy<T> {
     async fn load_initial_hierarchy(&self) -> Result<Vec<OctreeNode>, PotreeHierarchyError> {
