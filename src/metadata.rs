@@ -37,8 +37,11 @@ pub struct Metadata {
     pub points: u64,
     pub projection: String,
     pub hierarchy: HierarchyMetadata,
-    pub offset: [f32; 3],
-    pub scale: [f32; 3],
+    /// Stored as f64: georeferenced clouds (e.g. UTM coordinates ~10^5 m) lose
+    /// decimeter-level precision in f32. Values are only narrowed to f32 at the
+    /// render boundary (`Aabb`, `PointBuffer`), after node-relative math.
+    pub offset: [f64; 3],
+    pub scale: [f64; 3],
     pub spacing: f32,
     pub bounding_box: BoundingBox,
     pub encoding: String,
@@ -56,8 +59,8 @@ pub struct HierarchyMetadata {
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct BoundingBox {
-    pub min: [f32; 3],
-    pub max: [f32; 3],
+    pub min: [f64; 3],
+    pub max: [f64; 3],
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -87,47 +90,46 @@ pub enum AttributeFormat {
 }
 
 impl AttributeFormat {
-    pub fn parse(&self, bytes: &[u8]) -> f32 {
+    pub fn parse(&self, bytes: &[u8]) -> f64 {
         match self {
-            AttributeFormat::Int8 => bytes[0] as i8 as f32,
+            AttributeFormat::Int8 => bytes[0] as i8 as f64,
 
-            AttributeFormat::UInt8 => bytes[0] as f32,
+            AttributeFormat::UInt8 => bytes[0] as f64,
 
             AttributeFormat::Int16 => {
                 let v = i16::from_le_bytes(bytes[0..2].try_into().unwrap());
-                v as f32
+                v as f64
             }
 
             AttributeFormat::UInt16 => {
                 let v = u16::from_le_bytes(bytes[0..2].try_into().unwrap());
-                v as f32
+                v as f64
             }
 
             AttributeFormat::Int32 => {
                 let v = i32::from_le_bytes(bytes[0..4].try_into().unwrap());
-                v as f32
+                v as f64
             }
 
             AttributeFormat::UInt32 => {
                 let v = u32::from_le_bytes(bytes[0..4].try_into().unwrap());
-                v as f32
+                v as f64
             }
 
             AttributeFormat::Int64 => {
                 let v = i64::from_le_bytes(bytes[0..8].try_into().unwrap());
-                v as f32
+                v as f64
             }
 
             AttributeFormat::UInt64 => {
                 let v = u64::from_le_bytes(bytes[0..8].try_into().unwrap());
-                v as f32
+                v as f64
             }
 
-            AttributeFormat::Float => f32::from_le_bytes(bytes[0..4].try_into().unwrap()),
+            AttributeFormat::Float => f32::from_le_bytes(bytes[0..4].try_into().unwrap()) as f64,
 
             AttributeFormat::Double => {
-                let v = f64::from_le_bytes(bytes[0..8].try_into().unwrap());
-                v as f32
+                f64::from_le_bytes(bytes[0..8].try_into().unwrap())
             }
 
             AttributeFormat::Undefined => 0.0,
@@ -147,8 +149,8 @@ pub struct AttributeMetadata {
     /// contains a single element size
     pub element_size: u16,
     pub r#type: AttributeFormat,
-    pub min: Vec<f32>,
-    pub max: Vec<f32>,
+    pub min: Vec<f64>,
+    pub max: Vec<f64>,
 }
 
 impl Metadata {
@@ -231,9 +233,15 @@ impl Metadata {
                         let y = LittleEndian::read_u32(&bytes[element_size..2 * element_size]);
                         let z = LittleEndian::read_u32(&bytes[2 * element_size..3 * element_size]);
 
-                        attribute[0] = x as f32 * scale[0] + offset[0] - bounding_box.min.x;
-                        attribute[1] = y as f32 * scale[1] + offset[1] - bounding_box.min.y;
-                        attribute[2] = z as f32 * scale[2] + offset[2] - bounding_box.min.z;
+                        // Decode in f64: the absolute coordinate can exceed f32
+                        // precision (georeferenced clouds); only the small
+                        // node-relative result is narrowed.
+                        attribute[0] =
+                            (x as f64 * scale[0] + offset[0] - bounding_box.min.x as f64) as f32;
+                        attribute[1] =
+                            (y as f64 * scale[1] + offset[1] - bounding_box.min.y as f64) as f32;
+                        attribute[2] =
+                            (z as f64 * scale[2] + offset[2] - bounding_box.min.z as f64) as f32;
 
                         let index = to_index(&Vec3::from_slice(attribute), &size);
                         grid[index] += 1;
@@ -282,9 +290,11 @@ impl Metadata {
                                 (0.0, 1.0)
                             };
 
-                            attribute[i] =
-                                point_attribute.r#type.parse(&bytes[i..i + element_size]) * scale
-                                    + offset;
+                            attribute[i] = (point_attribute
+                                .r#type
+                                .parse(&bytes[i..i + element_size])
+                                * scale
+                                + offset) as f32;
                         }
                     }
                 }
@@ -345,9 +355,15 @@ impl Metadata {
                         let bytes = &decompressed_buffer[byte_offset..byte_offset + 16];
                         let (x, y, z) = read_morton_128(bytes);
 
-                        attribute[0] = x as f32 * scale[0] + offset[0] - bounding_box.min.x;
-                        attribute[1] = y as f32 * scale[1] + offset[1] - bounding_box.min.y;
-                        attribute[2] = z as f32 * scale[2] + offset[2] - bounding_box.min.z;
+                        // Decode in f64: the absolute coordinate can exceed f32
+                        // precision (georeferenced clouds); only the small
+                        // node-relative result is narrowed.
+                        attribute[0] =
+                            (x as f64 * scale[0] + offset[0] - bounding_box.min.x as f64) as f32;
+                        attribute[1] =
+                            (y as f64 * scale[1] + offset[1] - bounding_box.min.y as f64) as f32;
+                        attribute[2] =
+                            (z as f64 * scale[2] + offset[2] - bounding_box.min.z as f64) as f32;
 
                         let index = to_index(&Vec3::from_slice(attribute), &size);
                         grid[index] += 1;
@@ -391,9 +407,11 @@ impl Metadata {
                                 (0.0, 1.0)
                             };
 
-                            attribute[i] =
-                                point_attribute.r#type.parse(&bytes[i..i + element_size]) * scale
-                                    + offset;
+                            attribute[i] = (point_attribute
+                                .r#type
+                                .parse(&bytes[i..i + element_size])
+                                * scale
+                                + offset) as f32;
 
                             byte_offset += point_attribute.size as usize;
                         }
@@ -437,9 +455,10 @@ fn to_index(position: &Vec3, size: &Vec3) -> usize {
 
 impl From<BoundingBox> for Aabb {
     fn from(val: BoundingBox) -> Self {
+        // Render-boundary narrowing: Aabb is glam/f32 territory.
         Aabb {
-            min: val.min.into(),
-            max: val.max.into(),
+            min: val.min.map(|v| v as f32).into(),
+            max: val.max.map(|v| v as f32).into(),
         }
     }
 }
