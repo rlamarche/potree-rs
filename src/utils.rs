@@ -1,4 +1,3 @@
-#[cfg(not(target_arch = "wasm32"))]
 use std::pin::Pin;
 
 #[cfg(not(target_arch = "wasm32"))]

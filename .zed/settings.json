@@ -8,6 +8,7 @@
       "initialization_options": {
         "cargo": {
           "features": [
+            "async",
             "fs",
             "ehttp",
             "slab",

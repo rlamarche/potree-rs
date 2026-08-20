@@ -24,12 +24,12 @@ name = "read_native_blocking_fs"
 required-features = ["blocking_fs"]
 
 [[example]]
-path = "examples/read_native_http.rs"
+path = "examples/read_native_http_ehttp.rs"
 name = "read_native_ehttp"
 required-features = ["ehttp", "tokio_dev"]
 
 [[example]]
-path = "examples/read_native_http.rs"
+path = "examples/read_native_http_reqwest.rs"
 name = "read_native_reqwest"
 required-features = ["reqwest", "tokio_dev"]
 
