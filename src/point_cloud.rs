@@ -9,7 +9,7 @@ use crate::metadata::Points;
 use crate::octree::node::{iter_one_bits, NodeType, OctreeNode};
 use crate::octree::snapshot::OctreeNodeSnapshot;
 use crate::octree::{NodeId, Octree};
-use async_trait::async_trait;
+use crate::utils::{BoxFuture, ConditionalSendFuture};
 use binrw::prelude::*;
 use thiserror::Error;
 
@@ -28,24 +28,32 @@ pub struct PointCloud<T> {
     pub(crate) octree: Octree<OctreeNode>,
 }
 
-#[async_trait]
 pub trait PointCloudAsync<T: PotreeAsset> {
-    async fn load_initial_hierarchy(&mut self) -> Result<(), PotreeHierarchyError>;
+    fn load_initial_hierarchy(
+        &mut self,
+    ) -> impl ConditionalSendFuture<Output = Result<(), PotreeHierarchyError>>;
 
-    async fn load_hierarchy(&mut self, node_id: NodeId) -> Result<(), PotreePointCloudError>;
-
-    async fn load_entire_hierarchy(&mut self) -> Result<(), PotreePointCloudError>;
-
-    async fn load_entire_hierarchy_recursive(
+    fn load_hierarchy(
         &mut self,
         node_id: NodeId,
-    ) -> Result<(), PotreePointCloudError>;
+    ) -> impl ConditionalSendFuture<Output = Result<(), PotreePointCloudError>>;
+
+    fn load_entire_hierarchy(
+        &mut self,
+    ) -> impl ConditionalSendFuture<Output = Result<(), PotreePointCloudError>>;
+
+    fn load_entire_hierarchy_recursive<'a>(
+        &'a mut self,
+        node_id: NodeId,
+    ) -> BoxFuture<'a, Result<(), PotreePointCloudError>>;
 
     // Functions to load points
-    async fn load_points(&self, node_id: NodeId) -> Result<Points, PotreePointCloudError>;
+    fn load_points(
+        &self,
+        node_id: NodeId,
+    ) -> impl ConditionalSendFuture<Output = Result<Points, PotreePointCloudError>>;
 }
 
-#[async_trait]
 impl<T: PotreeAsset> PointCloudAsync<T> for PointCloud<T> {
     async fn load_initial_hierarchy(&mut self) -> Result<(), PotreeHierarchyError> {
         // load root node metadatas
@@ -159,27 +167,29 @@ impl<T: PotreeAsset> PointCloudAsync<T> for PointCloud<T> {
         Ok(())
     }
 
-    async fn load_entire_hierarchy_recursive(
-        &mut self,
+    fn load_entire_hierarchy_recursive<'a>(
+        &'a mut self,
         node_id: NodeId,
-    ) -> Result<(), PotreePointCloudError> {
-        // load node's hierarchy if needed
-        self.load_hierarchy(node_id).await?;
+    ) -> BoxFuture<'a, Result<(), PotreePointCloudError>> {
+        Box::pin(async move {
+            // load node's hierarchy if needed
+            self.load_hierarchy(node_id).await?;
 
-        // get the node
-        let node = self
-            .octree
-            .node(node_id)
-            .ok_or_else(|| PotreePointCloudError::NodeNotFound(node_id))?;
+            // get the node
+            let node = self
+                .octree
+                .node(node_id)
+                .ok_or_else(|| PotreePointCloudError::NodeNotFound(node_id))?;
 
-        let children = node.children;
+            let children = node.children;
 
-        for i in iter_one_bits(node.children_mask) {
-            let child = children[i as usize];
-            Box::pin(self.load_entire_hierarchy_recursive(child)).await?;
-        }
+            for i in iter_one_bits(node.children_mask) {
+                let child = children[i as usize];
+                Box::pin(self.load_entire_hierarchy_recursive(child)).await?;
+            }
 
-        Ok(())
+            Ok(())
+        })
     }
 
     // Functions to load points

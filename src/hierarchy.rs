@@ -15,7 +15,7 @@ use crate::octree::node::{NodeType, OctreeNode};
 use crate::parse::parse_flat_hierarchy;
 use crate::parse::ParseHierarchyError;
 #[cfg(feature = "async")]
-use async_trait::async_trait;
+use crate::utils::ConditionalSendFuture;
 use binrw::prelude::*;
 #[cfg(feature = "async")]
 use std::collections::VecDeque;
@@ -84,24 +84,30 @@ impl Hierarchy<PotreeFsAsset> {
 }
 
 #[cfg(feature = "async")]
-#[async_trait]
 pub trait HierarchyAsync<T: PotreeAsset> {
-    async fn load_initial_hierarchy(&self) -> Result<Vec<OctreeNode>, PotreeHierarchyError>;
+    fn load_initial_hierarchy(
+        &self,
+    ) -> impl ConditionalSendFuture<Output = Result<Vec<OctreeNode>, PotreeHierarchyError>>;
 
-    async fn load_hierarchy(
+    fn load_hierarchy(
         &self,
         node: &OctreeNode,
-    ) -> Result<Vec<OctreeNode>, PotreeHierarchyError>;
+    ) -> impl ConditionalSendFuture<Output = Result<Vec<OctreeNode>, PotreeHierarchyError>>;
 
-    async fn load_entire_hierarchy(&self) -> Result<Vec<OctreeNode>, PotreeHierarchyError>;
+    fn load_entire_hierarchy(
+        &self,
+    ) -> impl ConditionalSendFuture<Output = Result<Vec<OctreeNode>, PotreeHierarchyError>>;
 
-    async fn load_entire_hierarchy_from_proxy(
+    fn load_entire_hierarchy_from_proxy(
         &self,
         node: OctreeNode,
-    ) -> Result<Vec<OctreeNode>, PotreeHierarchyError>;
+    ) -> impl ConditionalSendFuture<Output = Result<Vec<OctreeNode>, PotreeHierarchyError>>;
 
     // Functions to load points
-    async fn load_points(&self, node: &OctreeNode) -> Result<Points, PotreeHierarchyError>;
+    fn load_points(
+        &self,
+        node: &OctreeNode,
+    ) -> impl ConditionalSendFuture<Output = Result<Points, PotreeHierarchyError>>;
 }
 
 #[cfg(feature = "async")]
@@ -125,7 +131,6 @@ impl<T: PotreeAsset> Hierarchy<T> {
 }
 
 #[cfg(feature = "async")]
-#[async_trait]
 impl<T: PotreeAsset> HierarchyAsync<T> for Hierarchy<T> {
     async fn load_initial_hierarchy(&self) -> Result<Vec<OctreeNode>, PotreeHierarchyError> {
         // load root node metadatas
@@ -161,7 +166,7 @@ impl<T: PotreeAsset> HierarchyAsync<T> for Hierarchy<T> {
     async fn load_entire_hierarchy(&self) -> Result<Vec<OctreeNode>, PotreeHierarchyError> {
         let root = self.metadata.create_flat_root_node();
 
-        Ok(self.load_entire_hierarchy_from_proxy(root).await?)
+        self.load_entire_hierarchy_from_proxy(root).await
     }
 
     async fn load_entire_hierarchy_from_proxy(

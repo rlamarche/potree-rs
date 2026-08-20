@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use bytes::Bytes;
 use thiserror::Error;
 use url::Url;
@@ -63,7 +62,6 @@ impl PotreeUrlAsset {
     }
 }
 
-#[async_trait]
 impl PotreeAsset for PotreeUrlAsset {
     type Error = PotreeUrlAssetError;
 

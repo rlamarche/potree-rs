@@ -11,3 +11,4 @@ pub mod point;
 #[cfg(feature = "slab")]
 pub mod point_cloud;
 pub mod prelude;
+pub mod utils;

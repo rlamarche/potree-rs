@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use bytes::Bytes;
 #[cfg(target_arch = "wasm32")]
 use ehttp::Mode;
@@ -79,27 +78,24 @@ impl PotreeHttpAsset {
     }
 }
 
-#[async_trait]
 impl PotreeAsset for PotreeHttpAsset {
     type Error = PotreeHttpAssetError;
 
     async fn read_metadata(&self) -> Result<Bytes, Self::Error> {
         let metadata_url = format!("{}/metadata.json", self.base_url);
-        Ok(self.get(metadata_url.as_str(), None).await?)
+        self.get(metadata_url.as_str(), None).await
     }
 
     async fn read_hierarchy(&self, offset: u64, length: usize) -> Result<Bytes, Self::Error> {
         let hierarchy_url = format!("{}/hierarchy.bin", self.base_url);
-        Ok(self
-            .get_range(hierarchy_url.as_str(), offset, length, None)
-            .await?)
+        self.get_range(hierarchy_url.as_str(), offset, length, None)
+            .await
     }
 
     async fn read_octree(&self, offset: u64, length: usize) -> Result<Bytes, Self::Error> {
         let octree_url = format!("{}/octree.bin", self.base_url);
-        Ok(self
-            .get_range(octree_url.as_str(), offset, length, None)
-            .await?)
+        self.get_range(octree_url.as_str(), offset, length, None)
+            .await
     }
 }
 

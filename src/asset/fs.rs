@@ -2,7 +2,6 @@
 use std::io::SeekFrom;
 use std::path::PathBuf;
 
-use async_trait::async_trait;
 use bytes::Bytes;
 use thiserror::Error;
 #[cfg(feature = "tokio")]
@@ -22,7 +21,6 @@ impl PotreeFsAsset {
     }
 }
 
-#[async_trait]
 impl PotreeAsset for PotreeFsAsset {
     type Error = PotreeFsAssetError;
 
