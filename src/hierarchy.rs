@@ -33,6 +33,12 @@ pub struct Hierarchy<T> {
     pub(crate) asset: T,
 }
 
+impl<T> Hierarchy<T> {
+    pub fn metadata(&self) -> &Metadata {
+        &self.metadata
+    }
+}
+
 #[cfg(any(feature = "reqwest", feature = "ehttp", feature = "fs"))]
 impl Hierarchy<PotreeUrlAsset> {
     /// Load a Potree point cloud from a URL.
